@@ -60,7 +60,7 @@ function downbilibilivideo(userstdin) {
 	 		console.log('can`t get right data');
 	 	}
 	});
-	function downloadfile(videourl,file,flag) {
+	function downloadfile(videourl,file,i,result) {
 	    http.get(videourl,function(res) {
 	    	res.on('data',function(data) {
 				  file.write(data)
@@ -71,15 +71,27 @@ function downbilibilivideo(userstdin) {
 				  }
 	    	})
 	    	res.on('end',function() {
-	    		if(flag==1){
-		    		file.end();
-		    		if(process.stdout){
+	    		// if(i>=0 && i<result.video.durl){
+	    		// 	i++;
+	    		// 	downloadfile(result.video.durl[i].url[0],file,i,result);
+	    		// }else{
+	    			file.end();
+	    			if(process.stdout){
 		    		process.stdout.write('||OK\ncompleted!\n');//文件被保存
 					 }else{
 					  	console.log('completed!'); 						  	
 					 } 	
-					process.abort();		
-	    		}
+					// process.abort();	
+	    // 		}
+	    // 		if(flag==1){
+		   //  		file.end();
+		   //  		if(process.stdout){
+		   //  		process.stdout.write('||OK\ncompleted!\n');//文件被保存
+					//  }else{
+					//   	console.log('completed!'); 						  	
+					//  } 	
+					// process.abort();		
+	    // 		}
 	    	})
 	    })
 	}
@@ -112,6 +124,7 @@ function downbilibilivideo(userstdin) {
 	  				parseString(xml, function (err, result) {
 	  					var flag = 0;
 	  					var file;
+	  					// var i = 0;
 	  					for (var i in result.video.durl) {
 	  						var videourl = result.video.durl[i].url[0];
 		  					var type = result.video.format[0];
@@ -120,24 +133,24 @@ function downbilibilivideo(userstdin) {
 		  						return null;
 		  					}
 						    console.log('fetch from:'+videourl);
-						    var filename = cid+'.'+type;
+						    var filename = cid+'-'+i+'.'+type;
 						    if(process.stdout){
 								  	process.stdout.write('start downloading '+filename);
 							}else{
 								  	console.log('start downloading '+filename); 						  	
 							}
-							if(i >= (result.video.durl.length-1)){
+							// if(i >= (result.video.durl.length-1)){
 							// console.log(i +' '+ result.video.durl.length);
-								flag = 1;
-							}
-							fs.exists(filename, function (exists) {
-							  if(!exists){
-								 file = fs.createWriteStream(filename);
-							  }
-							  downloadfile(videourl,file,flag);
-							  if(flag==1) return;
-							});
-							  if(flag==1) return;
+							// 	flag = 1;
+							// }
+							// fs.exists(filename, function (exists) {
+							//   if(!exists){
+							file = fs.createWriteStream(filename);
+							  // }
+							  downloadfile(videourl,file,i,result);
+							//   if(flag==1) return;
+							// });
+							  // if(flag==1) return;
 	  					}
 					});
 	  			})
@@ -148,7 +161,7 @@ function downbilibilivideo(userstdin) {
 		var secretkey = '2ad42749773c441109bdc0191257a664'
 		var code = md5.update('appkey=' + appkey + '&cid=' + cid + secretkey).digest('hex');
 		var requesturl = 'http://interface.bilibili.com/playurl?appkey=' + appkey + '&cid=' + cid + '&sign=' + code;
-		// console.log(requesturl);
+		console.log(requesturl);
 		geturl(requesturl,cid); 
 	}
 	function analyzehtml(res) {
