@@ -13,28 +13,20 @@ var rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
-console.log('    \\　　　/         /＼7　　　 ∠＿/ ');
-console.log('　   \\　　/ 　   　 /　│　　 ／　／ ');
-console.log('　 ___\\__/___　 　 │　Z ＿,＜　／　　 /`ヽ ');
-console.log('  │　　　　　|　　│　　　　　ヽ　　 /　　〉 ');
-console.log('  | / 　   \\ |  　 Y　　　　　`　 /　　/ ');
-console.log('  │　　　　　|　　ｲ●　､　●　　⊂⊃〈　　/ ');
-console.log('  │　\\_/\\_/  |　　()　 へ　　　　|　＼〈 ');
-console.log('  │　　　　　|　　　>ｰ ､_　 ィ　 │ ／／ ');
-console.log('   ￣￣￣￣￣ 　  / へ　　 /　ﾉ＜| ＼＼ ');
-console.log('                 ヽ_ﾉ　　(_／　 │／／ ');
-console.log('                 7　　　　　　　|／ ');
-console.log('                 ＞―r￣￣`ｰ―＿| ');
+
 rl.question('请输入b站视频地址:', (userstdin) => {
+  // TODO: Log the answer in a database
+  // console.log('check:', userstdin);
   if(userstdin.match('bilibili')){
   	downbilibilivideo(userstdin);
   }
   else{
-  	console.log('请输入b站视频的地址');
   	process.abort();
+  	console.log('请输入正确的地址');
   }
-  rl.pause();
+  rl.close();
 });
+// var userstdin="http://bangumi.bilibili.com/anime/v/91061";
 function downbilibilivideo(userstdin) {
 	var temp = userstdin.split('/').pop();
 	var aid;
@@ -69,33 +61,29 @@ function downbilibilivideo(userstdin) {
 	 	}
 	});
 	function downloadfile(videourl,file,i,result) {
+		console.log('Ok');
 	    http.get(videourl,function(res) {
-	    	var datalength = 0;
 	    	res.on('data',function(data) {
-	    		datalength +=data.length;
-	    		// console.log(data.length+'/'+datalength);
-	    		var alldata = Number(result.video.durl[i].size[0]);
-	    		var precent = datalength/alldata;
-				  file.write(data)
-					  if(process.stdout){
-					  	readline.clearLine(process.stdout,0);
-					  	process.stdout.cursorTo(0);
-					  	process.stdout.write('video-'+(Number(i)+1)+'is downloading '+precent*100+'% speed:'+data.length+'/res');
-					  }else{
-					  	console.log('downloading'); 						  	
-					  }
-				  
+	    		// data.pipe(file);
+				  file.write(data);
 	    	})
 	    	res.on('end',function() {
+	    		console.log(i);
+	    		if(i>=0 && i<(result.video.durl.length-1)){
+	    			i++;
+	    			console.log(result.video.durl[i].url[0]);
+	    			downloadfile(result.video.durl[i].url[0],file,i,result);
+	    		}else{
 	    			file.end();
 	    			if(process.stdout){
-		    		process.stdout.write('\nvideo-'+(Number(i)+1)+' download completed!\n');//文件被保存
+		    		process.stdout.write('||OK\ncompleted!\n');//文件被保存
 					 }else{
 					  	console.log('completed!'); 						  	
 					 } 	
-					process.abort();
+	    		}
 	    	})
 	    })
+	    
 	}
 	function selecttype(type) {
 		if(type=="hdmp4" || type=="mp4"){
@@ -124,24 +112,38 @@ function downbilibilivideo(userstdin) {
 	  			})
 	  			res.on('end',function() {
 	  				parseString(xml, function (err, result) {
-	  					for (var i in result.video.durl) {
+	  					var flag = 0;
+	  					var file;
+	  					var i = 0;
+	  					// for (var i in result.video.durl) {
 	  						var videourl = result.video.durl[i].url[0];
-	  						console.log('总计'+result.video.durl.length+'个视频分段');
 		  					var type = result.video.format[0];
 		  					type = selecttype(type);
 		  					if(type==null){
 		  						return null;
 		  					}
 						    console.log('fetch from:'+videourl);
-						    var filename = cid+'-'+(Number(i)+1)+'.'+type;
+						    var filename = cid+'-'+i+'.'+type;
 						    if(process.stdout){
-								  	process.stdout.write('start downloading '+filename+'\n');
+								  	process.stdout.write('start downloading '+filename);
 							}else{
 								  	console.log('start downloading '+filename); 						  	
 							}
-							var file = fs.createWriteStream(filename);
-							 downloadfile(videourl,file,i,result);
-	  					}
+							// if(i >= (result.video.durl.length-1)){
+							// console.log(i +' '+ result.video.durl.length);
+							// 	flag = 1;
+							// }
+							// fs.exists(filename, function (exists) {
+							//   if(!exists){
+							file = fs.createWriteStream(filename,{
+								flag:'a'
+							});
+							  // }
+							  downloadfile(videourl,file,i,result);
+							//   if(flag==1) return;
+							// });
+							  // if(flag==1) return;
+	  					// }
 					});
 	  			})
 	  		})
@@ -151,7 +153,7 @@ function downbilibilivideo(userstdin) {
 		var secretkey = '2ad42749773c441109bdc0191257a664'
 		var code = md5.update('appkey=' + appkey + '&cid=' + cid + secretkey).digest('hex');
 		var requesturl = 'http://interface.bilibili.com/playurl?appkey=' + appkey + '&cid=' + cid + '&sign=' + code;
-		// console.log(requesturl);
+		console.log(requesturl);
 		geturl(requesturl,cid); 
 	}
 	function analyzehtml(res) {
