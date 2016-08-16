@@ -14,6 +14,7 @@ npm install
 ```
 node bilibilidownload.js
 ```
+###all done，开始享受PC端的bilibili下载吧！
 *附注：
 ###以上步骤后提示输入视频地址，格式参见以下示例。
 ###由于时间有限只实验了部分地址，但理论上是通用的，现将实验地址公布如下：
@@ -21,7 +22,7 @@ node bilibilidownload.js
 ####http://www.bilibili.com/video/av2782004/index_2.html
 ####http://www.bilibili.com/video/av2782004/index_1.html
 ###普通：
-####
+####http://www.bilibili.com/video/av5817373/
 ###番剧：
 ####http://bangumi.bilibili.com/anime/v/91133
 ###示例图
@@ -33,6 +34,5 @@ node bilibilidownload.js
 ###感谢[BlackGlory](https://www.blackglory.me/bilibili-video-source-get/)
 ###本方案基于他和其他一些资料对bilibili api的分析和网络请求的查看
 ###本方案仅作学习交流之用
-###all down，开始享受PC端的bilibili下载吧！
 
 
