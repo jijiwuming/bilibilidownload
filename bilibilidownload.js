@@ -71,16 +71,20 @@ function downbilibilivideo(userstdin) {
 	function downloadfile(videourl,file,i,result) {
 	    http.get(videourl,function(res) {
 	    	var datalength = 0;
+	    	res.on('start',function() {
+				console.log(' ');
+	    	})
 	    	res.on('data',function(data) {
 	    		datalength +=data.length;
 	    		// console.log(data.length+'/'+datalength);
 	    		var alldata = Number(result.video.durl[i].size[0]);
 	    		var precent = datalength/alldata;
-				  file.write(data)
+				  file.write(data);
 					  if(process.stdout){
-					  	readline.clearLine(process.stdout,0);
-					  	process.stdout.cursorTo(0);
+						readline.cursorTo(process.stdout, 0, process.stdout.rows-Number(i)-1);
+					  	// process.stdout.cursorTo(0);
 					  	process.stdout.write('video-'+(Number(i)+1)+'is downloading '+precent*100+'% speed:'+data.length+'/res');
+					  	readline.clearLine(process.stdout,1);
 					  }else{
 					  	console.log('downloading'); 						  	
 					  }
@@ -89,11 +93,12 @@ function downbilibilivideo(userstdin) {
 	    	res.on('end',function() {
 	    			file.end();
 	    			if(process.stdout){
-		    		process.stdout.write('\nvideo-'+(Number(i)+1)+' download completed!\n');//文件被保存
+						readline.cursorTo(process.stdout, 0, process.stdout.rows-Number(i));
+		    			process.stdout.write('download completed!\n');//文件被保存
+					  	readline.clearLine(process.stdout,1);
 					 }else{
 					  	console.log('completed!'); 						  	
 					 } 	
-					process.abort();
 	    	})
 	    })
 	}
@@ -124,9 +129,9 @@ function downbilibilivideo(userstdin) {
 	  			})
 	  			res.on('end',function() {
 	  				parseString(xml, function (err, result) {
+	  					console.log('总计'+result.video.durl.length+'个视频分段');
 	  					for (var i in result.video.durl) {
 	  						var videourl = result.video.durl[i].url[0];
-	  						console.log('总计'+result.video.durl.length+'个视频分段');
 		  					var type = result.video.format[0];
 		  					type = selecttype(type);
 		  					if(type==null){
@@ -143,6 +148,7 @@ function downbilibilivideo(userstdin) {
 							 downloadfile(videourl,file,i,result);
 	  					}
 					});
+					console.log(' ');
 	  			})
 	  		})
 	}

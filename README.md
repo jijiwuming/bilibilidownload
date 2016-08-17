@@ -25,6 +25,7 @@ node bilibilidownload.js
 ####http://www.bilibili.com/video/av5817373/
 ###番剧：
 ####http://bangumi.bilibili.com/anime/v/91133
+####支持边下边播
 ###示例图
 ![示例](./example.png)
 ##现阶段问题
