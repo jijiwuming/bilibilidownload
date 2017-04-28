@@ -35,6 +35,7 @@ rl.question('请输入b站视频地址:', (userstdin) => {
   }
   rl.pause();
 });
+
 function downbilibilivideo(userstdin) {
 	var temp = userstdin.split('/').pop();
 	var aid;
@@ -138,7 +139,7 @@ function downbilibilivideo(userstdin) {
 		  						return null;
 		  					}
 						    console.log('fetch from:'+videourl);
-						    var filename = cid+'-'+(Number(i)+1)+'.'+type;
+						    var filename = 'download/' + cid+'-'+(Number(i)+1)+'.'+type;
 						    if(process.stdout){
 								  	process.stdout.write('start downloading '+filename+'\n');
 							}else{
@@ -153,10 +154,10 @@ function downbilibilivideo(userstdin) {
 	  		})
 	}
 	function getcid(cid) {
-		var appkey='85eb6835b0a1034e';  
-		var secretkey = '2ad42749773c441109bdc0191257a664'
-		var code = md5.update('appkey=' + appkey + '&cid=' + cid + secretkey).digest('hex');
-		var requesturl = 'http://interface.bilibili.com/playurl?appkey=' + appkey + '&cid=' + cid + '&sign=' + code;
+		var appkey='f3bb208b3d081dc8';
+		var secretkey = '1c15888dc316e05a15fdd0a02ed6584f'
+		var code = md5.update('appkey=' + appkey + '&cid=' + cid + '&from=miniplay&player=1&quality=1&type=mp4' + secretkey).digest('hex');
+		var requesturl = 'http://interface.bilibili.com/playurl?&appkey=' + appkey + '&cid=' + cid +  '&from=miniplay&player=1&quality=1&type=mp4' + '&sign=' + code;
 		// console.log(requesturl);
 		geturl(requesturl,cid); 
 	}
