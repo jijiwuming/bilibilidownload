@@ -2,16 +2,15 @@ import { appkey, secretkey } from './config'
 const crypto = require('crypto')
 const readline = require('readline')
 const url = require('url')
-const fs = require('fs')
 const http = require('http')
 const https = require('https')
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path
 const path = require('path')
 const jsdom = require('jsdom')
 const { JSDOM } = jsdom
 const { Console } = require('console')
-// const ffmpeg = require('fluent-ffmpeg')
-// ffmpeg对象
-// const command = ffmpeg()
+const ffmpeg = require('fluent-ffmpeg')
+ffmpeg.setFfmpegPath(ffmpegPath)
 const myConsole = new Console(process.stdout, process.stderr)
 const rl = readline.createInterface({
     input: process.stdin,
@@ -19,10 +18,12 @@ const rl = readline.createInterface({
 })
 // 循环获取输入
 function getStdin() {
-    rl.question('请输入b站视频地址:', userstdin => {
+    rl.question('请输入b站视频地址:', async userstdin => {
         rl.pause()
         if (userstdin) {
-            analyzehtml(userstdin)
+            await analyzehtml(userstdin).catch(e => {
+                myConsole.log(e.message)
+            })
         }
         // 再恢复输入接收状态
         rl.resume()
@@ -140,7 +141,7 @@ function getRequest(requrl) {
                     try {
                         let obj = JSON.parse(rawData)
                         // 请求出错了
-                        if (obj && obj.message){
+                        if (obj && obj.message) {
                             reject(new Error(obj.message))
                         }
                         resolve(obj)
@@ -189,41 +190,62 @@ function getVideoStream(downurl) {
  *
  * @param {Object} obj
  */
-function downLoadByObjWithBackUrl(obj) {
+
+function downLoadByObjWithBackUrl(downobj) {
     // length 为时长ms， size为视频字节数
-    let { backup_url, url, order, size, length } = obj
+    let { backup_url, url } = downobj
     let urlArr = [...backup_url, url]
-    let filepath = path.resolve(__dirname, '../download/' + getFilename(url))
-    let writeStream = fs.createWriteStream(filepath)
     let promiseArr = []
     for (let downurl of urlArr) {
         promiseArr.push(getVideoStream(downurl))
     }
-    return new Promise((resolve, reject) => {
+    return new Promise(resolve => {
         Promise.race(promiseArr).then(res => {
-            res.pipe(writeStream)
-            let receivedLength = 0
-            res.on('data', chunk => {
-                receivedLength += chunk.length
-                let str = `${order}号流已接收:${(receivedLength * 100) / size}%`
-            })
-            writeStream.on('finish', () => {
-                resolve({
-                    filepath,
-                    writeStream,
-                    length
-                })
-            })
-            res.on('error', err => {
-                writeStream.close()
-                reject(err)
-            })
+            resolve(res)
         })
     })
 }
-// 获取文件名
-function getFilename(fileurl) {
-    return fileurl.slice(fileurl.lastIndexOf('/'), fileurl.indexOf('?'))
+function fetchVideoCommon(videourl) {
+    // 解析并下载
+    return getRequest(videourl).then(obj => {
+        let dobjarr = obj.durl
+        let promiseArr = []
+        let allSize = 0
+        for (const downobj of dobjarr) {
+            let { segmentSize } = downobj
+            allSize += segmentSize
+            promiseArr.push(downLoadByObjWithBackUrl(downobj))
+        }
+        return new Promise((resolve, reject) => {
+            Promise.all(promiseArr).then(streamArr => {
+                // ffmpeg对象
+                let [first, ...rest] = streamArr
+                let command = ffmpeg(first)
+                for (let stream of rest) {
+                    command.addInput(stream)
+                }
+                command
+                    .videoCodec('libx264')
+                    .format('mp4')
+                    .on('codecData', function(data) {
+                        myConsole.dir(data.video)
+                    })
+                    .on('error', err => {
+                        myConsole.dir(err)
+                        reject(err)
+                    })
+                    .on('end', () => {
+                        resolve()
+                        myConsole.log('Merging finished !')
+                    })
+                if (streamArr.length > 1) {
+                    command.mergeToFile('C:/Users/10202/Desktop/bilibilidownload/download/test.mp4', 'C:/Users/10202/Desktop/bilibilidownload/download/')
+                } else {
+                    command.save('C:/Users/10202/Desktop/bilibilidownload/download/test.mp4')
+                }
+            })
+        })
+    })
 }
 // 请求番剧或电视剧
 function fetchBangumiVideos({ cid, season_type = undefined } = {}) {
@@ -261,16 +283,7 @@ function fetchBangumiVideos({ cid, season_type = undefined } = {}) {
             Object.assign(hqQueryObj, bangumiBaseOptions, hqQuery)
             let hqQueryStr = url.format(hqQueryObj)
             // 第二次解析并下载
-            return getRequest(hqQueryStr).then(obj => {
-                let dobjarr = obj.durl
-                let promiseArr = []
-                for (const downobj of dobjarr) {
-                    promiseArr.push(downLoadByObjWithBackUrl(downobj))
-                }
-                return Promise.all(promiseArr).then(() => {
-                    myConsole.log('all done!')
-                })
-            })
+            return fetchVideoCommon(hqQueryStr)
         })
 }
 // 获取普通视频
@@ -283,21 +296,13 @@ function fetchOrdinaryVideo({ cid, quality } = {}) {
     let queryStr = url.format(queryObj)
     // myConsole.log(queryStr)
     // 获取地址
-    return getRequest(queryStr).then(obj => {
-        let dobjarr = obj.durl
-        let promiseArr = []
-        for (const downobj of dobjarr) {
-            promiseArr.push(downLoadByObjWithBackUrl(downobj))
-        }
-        return Promise.all(promiseArr).then(() => {
-            myConsole.log('all done!')
-        })
-    })
+    return fetchVideoCommon(queryStr)
 }
 // 分析地址获取cid
 function analyzehtml(bilibiliurl) {
     // 番剧：https://www.bilibili.com/bangumi/play/ss23851
-    JSDOM.fromURL(bilibiliurl, {
+    // let name = ''
+    return JSDOM.fromURL(bilibiliurl, {
         runScripts: 'dangerously'
     }).then(({ window }) => {
         if (window && window.__INITIAL_STATE__) {
@@ -310,6 +315,7 @@ function analyzehtml(bilibiliurl) {
             }
             if (window.__playinfo__ && window.__INITIAL_STATE__.videoData) {
                 cid = window.__INITIAL_STATE__.videoData.pages[page].cid
+                // name = window.__INITIAL_STATE__.videoData.title
                 let quality = window.__playinfo__.accept_quality.sort(
                     (a, b) => b - a
                 )

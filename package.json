@@ -4,6 +4,7 @@
     "description": "use nodejs and bilibili api",
     "main": "src/index.js",
     "dependencies": {
+        "@ffmpeg-installer/ffmpeg": "^1.0.15",
         "babel-runtime": "^6.26.0",
         "fluent-ffmpeg": "^2.1.2",
         "jsdom": "^11.11.0"
