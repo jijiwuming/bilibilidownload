@@ -20,9 +20,6 @@ node bilibilidownload.js
 ```
 ### all done，开始享受PC端的bilibili下载吧！
 
-### 示例图
-![示例](./example.png)
-
 ## 现阶段问题
 ### 由于bilibili视频采取了分段,限于编解码的问题，对于分段视频仅能分段下载
 

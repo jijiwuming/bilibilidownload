@@ -1,3 +1,4 @@
+import { appkey, secretkey } from './config'
 const crypto = require('crypto')
 const readline = require('readline')
 const url = require('url')
@@ -41,8 +42,6 @@ let videoBaseOptions = {
     hostname: 'interface.bilibili.com',
     pathname: '/v2/playurl'
 }
-const appkey = '84956560bc028eb7'
-const secretkey = '94aba54af9065f71de72f5508f1cd42e'
 /**
  * 通过cid获取参数
  *
@@ -161,11 +160,12 @@ function getRequest(requrl) {
 /**
  * 获取视频流
  *
- * @param {*} downurl 下载地址
+ * @param {string} downurl 下载地址
  * @returns
  */
 function getVideoStream(downurl) {
     let options = url.parse(downurl)
+    // 破解Referer防盗链
     Object.assign(options, {
         headers: {
             Referer: 'https://www.bilibili.com'
@@ -187,13 +187,13 @@ function getVideoStream(downurl) {
 /**
  * 下载带backurl的文件
  *
- * @param {*} obj
+ * @param {Object} obj
  */
 function downLoadByObjWithBackUrl(obj) {
     // length 为时长ms， size为视频字节数
     let { backup_url, url, order, size, length } = obj
     let urlArr = [...backup_url, url]
-    let filepath = path.resolve(__dirname, 'download/' + getFilename(url))
+    let filepath = path.resolve(__dirname, '../download/' + getFilename(url))
     let writeStream = fs.createWriteStream(filepath)
     let promiseArr = []
     for (let downurl of urlArr) {
@@ -205,9 +205,7 @@ function downLoadByObjWithBackUrl(obj) {
             let receivedLength = 0
             res.on('data', chunk => {
                 receivedLength += chunk.length
-                myConsole.dir(
-                    `${order}号流已接收:${(receivedLength * 100) / size}%`
-                )
+                let str = `${order}号流已接收:${(receivedLength * 100) / size}%`
             })
             writeStream.on('finish', () => {
                 resolve({
@@ -235,7 +233,7 @@ function fetchBangumiVideos({ cid, season_type = undefined } = {}) {
     let queryObj = {}
     Object.assign(queryObj, bangumiBaseOptions, query)
     let queryStr = url.format(queryObj)
-    myConsole.log(queryStr)
+    // myConsole.log(queryStr)
     // 获取地址
     return getRequest(queryStr)
         .then(obj => {
@@ -283,7 +281,7 @@ function fetchOrdinaryVideo({ cid, quality } = {}) {
     let queryObj = {}
     Object.assign(queryObj, videoBaseOptions, query)
     let queryStr = url.format(queryObj)
-    myConsole.log(queryStr)
+    // myConsole.log(queryStr)
     // 获取地址
     return getRequest(queryStr).then(obj => {
         let dobjarr = obj.durl
