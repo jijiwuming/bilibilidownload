@@ -5,6 +5,8 @@
   "main": "bilibilidownload.js",
   "dependencies": {
     "cheerio": "^0.20.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "jsdom": "^11.11.0",
     "xml2js": "^0.4.17"
   },
   "devDependencies": {},

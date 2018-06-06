@@ -2,10 +2,14 @@
 ### Node template
 # Logs
 logs
+download
+node_modules
+config.js
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.DS_Store
 
 # Runtime data
 pids
