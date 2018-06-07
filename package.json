@@ -4,7 +4,6 @@
     "description": "use nodejs and bilibili api",
     "main": "src/index.js",
     "dependencies": {
-        "@ffmpeg-installer/ffmpeg": "^1.0.15",
         "babel-runtime": "^6.26.0",
         "fluent-ffmpeg": "^2.1.2",
         "jsdom": "^11.11.0"
@@ -19,8 +18,9 @@
         "webpack-cli": "^3.0.2"
     },
     "scripts": {
-        "dev": "babel-node src/index.js",
-        "build": "webpack --config build/webpack.config.js"
+        "dev": "babel-node src/index.js C:/ffmpeg/bin/ffmpeg.exe C:/ffmpeg/bin/ffprobe.exe C:/ffmpeg/bin/ffplay.exe",
+        "build": "webpack --config build/webpack.config.js",
+        "start": "node dist/bilibilidownload.js C:/ffmpeg/bin/ffmpeg.exe C:/ffmpeg/bin/ffprobe.exe C:/ffmpeg/bin/ffplay.exe"
     },
     "keywords": [
         "bilibili",

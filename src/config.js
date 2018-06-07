@@ -12,4 +12,7 @@ let back = [
 */
 const appkey = '84956560bc028eb7'
 const secretkey = '94aba54af9065f71de72f5508f1cd42e'
-export { appkey, secretkey }
+module.exports = {
+    appkey,
+    secretkey
+}

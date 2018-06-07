@@ -1,16 +1,22 @@
-import { appkey, secretkey } from './config'
+/*
+const ffmpegPath = 'C:/ffmpeg/bin/ffmpeg.exe'
+const ffprobePath = 'C:/ffmpeg/bin/ffprobe.exe'
+const flvtoolPath = 'C:/ffmpeg/bin/ffplay.exe'
+ */
+let params = process.argv.splice(2)
+let [ffmpegPath, ffprobePath, flvtoolPath] = params
+let { appkey, secretkey } = require('./config')
 const crypto = require('crypto')
 const readline = require('readline')
 const url = require('url')
+const fs = require('fs')
 const http = require('http')
 const https = require('https')
-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path
 const path = require('path')
 const jsdom = require('jsdom')
 const { JSDOM } = jsdom
 const { Console } = require('console')
 const ffmpeg = require('fluent-ffmpeg')
-ffmpeg.setFfmpegPath(ffmpegPath)
 const myConsole = new Console(process.stdout, process.stderr)
 const rl = readline.createInterface({
     input: process.stdin,
@@ -22,7 +28,8 @@ function getStdin() {
         rl.pause()
         if (userstdin) {
             await analyzehtml(userstdin).catch(e => {
-                myConsole.log(e.message)
+                // myConsole.dir(e)
+                myConsole.log('Σ( ° △ °|||)︴粗问题了：' + e.message + '\n')
             })
         }
         // 再恢复输入接收状态
@@ -30,9 +37,7 @@ function getStdin() {
         getStdin()
     })
 }
-// 核心的请求地址
-// 类似https://bangumi.bilibili.com/player/web_api/v2/playurl?
-// cid=35943166&appkey=84956560bc028eb7&otype=json&type=&quality=32&module=bangumi&season_type=1&qn=32&sign=43dbf0d2c033f681f8ad49f47baae92f
+// 基础请求地址
 let bangumiBaseOptions = {
     protocol: 'https:',
     hostname: 'bangumi.bilibili.com',
@@ -44,9 +49,17 @@ let videoBaseOptions = {
     pathname: '/v2/playurl'
 }
 /**
- * 通过cid获取参数
+ * 获取签名参数
  *
- * @param {string} cid
+ * @param {Object} [{
+ *     cid,
+ *     moduleType = undefined,
+ *     otype = 'json',
+ *     qn = 32,
+ *     quality = 32,
+ *     season_type = undefined,
+ *     type = undefined
+ * }={}]
  * @returns {Object}
  */
 function getParams({
@@ -89,6 +102,13 @@ function getParams({
     }
     return obj
 }
+/**
+ * 获取路由参数
+ *
+ * @param {string} originStr 原串
+ * @param {string} param 要提取的路由参数名
+ * @returns {Array} 参数值数组
+ */
 function getUrlParamArr(originStr, param) {
     let regStr = new RegExp(`[\\?\\&]${param}=[^#\\&]*`, 'gi')
     if (!originStr || originStr === '') {
@@ -105,7 +125,6 @@ function getUrlParamArr(originStr, param) {
  * 封装json格式的http请求操作
  *
  * @param {string} requrl 请求地址
- * @param {RegExp} regex 请求类型的正则表达式
  * @returns {Promise}
  */
 function getRequest(requrl) {
@@ -186,69 +205,148 @@ function getVideoStream(downurl) {
     })
 }
 /**
+ * 根据下载链接获取文件名
+ *
+ * @param {string} fileurl
+ * @returns {string} 文件名
+ */
+function getFilename(fileurl) {
+    let endIndex =
+        fileurl.indexOf('?') > 0 ? fileurl.indexOf('?') : fileurl.length - 1
+    return fileurl.slice(fileurl.lastIndexOf('/'), endIndex)
+}
+/**
  * 下载带backurl的文件
  *
- * @param {Object} obj
+ * @param {Object} downobj
+ * @returns {Promise}
  */
-
 function downLoadByObjWithBackUrl(downobj) {
     // length 为时长ms， size为视频字节数
-    let { backup_url, url } = downobj
+    let { backup_url, url, order, size, length } = downobj
     let urlArr = [...backup_url, url]
+    let filepath = path.resolve(__dirname, './' + getFilename(url))
+    let writeStream = fs.createWriteStream(filepath)
     let promiseArr = []
     for (let downurl of urlArr) {
         promiseArr.push(getVideoStream(downurl))
     }
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
         Promise.race(promiseArr).then(res => {
-            resolve(res)
-        })
-    })
-}
-function fetchVideoCommon(videourl) {
-    // 解析并下载
-    return getRequest(videourl).then(obj => {
-        let dobjarr = obj.durl
-        let promiseArr = []
-        let allSize = 0
-        for (const downobj of dobjarr) {
-            let { segmentSize } = downobj
-            allSize += segmentSize
-            promiseArr.push(downLoadByObjWithBackUrl(downobj))
-        }
-        return new Promise((resolve, reject) => {
-            Promise.all(promiseArr).then(streamArr => {
-                // ffmpeg对象
-                let [first, ...rest] = streamArr
-                let command = ffmpeg(first)
-                for (let stream of rest) {
-                    command.addInput(stream)
-                }
-                command
-                    .videoCodec('libx264')
-                    .format('mp4')
-                    .on('codecData', function(data) {
-                        myConsole.dir(data.video)
-                    })
-                    .on('error', err => {
-                        myConsole.dir(err)
-                        reject(err)
-                    })
-                    .on('end', () => {
-                        resolve()
-                        myConsole.log('Merging finished !')
-                    })
-                if (streamArr.length > 1) {
-                    command.mergeToFile('C:/Users/10202/Desktop/bilibilidownload/download/test.mp4', 'C:/Users/10202/Desktop/bilibilidownload/download/')
-                } else {
-                    command.save('C:/Users/10202/Desktop/bilibilidownload/download/test.mp4')
-                }
+            res.pipe(writeStream)
+            let receivedLength = 0
+            res.on('data', chunk => {
+                receivedLength += chunk.length
+                readline.cursorTo(
+                    process.stdout,
+                    0,
+                    process.stdout.rows - Number(order) - 1
+                )
+                readline.clearLine(process.stdout, 0)
+                process.stdout.write(
+                    `${order}号分段已接收:${(receivedLength * 100) / size}%`
+                )
+            })
+            writeStream.on('finish', () => {
+                resolve({
+                    filepath,
+                    length
+                })
+            })
+            res.on('error', err => {
+                writeStream.close()
+                reject(err)
             })
         })
     })
 }
-// 请求番剧或电视剧
-function fetchBangumiVideos({ cid, season_type = undefined } = {}) {
+/**
+ * 解析地址并下载视频的公用接口
+ *
+ * @param {Object} { videourl, name }
+ * @returns {Promise}
+ */
+function fetchVideoCommon({ videourl, name }) {
+    return getRequest(videourl).then(obj => {
+        let dobjarr = obj.durl
+        let promiseArr = []
+        for (const downobj of dobjarr) {
+            myConsole.log('\n')
+            promiseArr.push(downLoadByObjWithBackUrl(downobj))
+        }
+        return Promise.all(promiseArr).then(pathArr => {
+            // 重置光标位置
+            readline.cursorTo(process.stdout, 0, process.stdout.rows - 1)
+            myConsole.log('已下载完成全部分段 ヽ(✿ﾟ▽ﾟ)ノ\n')
+            if (ffmpegPath && ffprobePath && flvtoolPath) {
+                let command = ffmpeg()
+                    .setFfmpegPath(ffmpegPath)
+                    .setFfprobePath(ffprobePath)
+                    .setFlvtoolPath(flvtoolPath)
+                for (let { filepath } of pathArr) {
+                    command = command.input(filepath)
+                }
+                return new Promise((resolve, reject) => {
+                    command
+                        .videoCodec('libx264')
+                        .format('mp4')
+                        .mergeToFile(
+                            path.resolve(__dirname, `./${name}.mp4`),
+                            path.resolve(__dirname, './')
+                        )
+                        .on('start', function(commandLine) {
+                            process.stdout.write(
+                                '开始转码合并文件\nFfmpeg命令: ' +
+                                    commandLine +
+                                    '\n'
+                            )
+                        })
+                        .on('codecData', function(data) {
+                            process.stdout.write(
+                                '输入流信息:' + data.video + '\n'
+                            )
+                        })
+                        .on('progress', function(progress) {
+                            readline.clearLine(process.stdout, 0)
+                            readline.cursorTo(
+                                process.stdout,
+                                0,
+                                process.stdout.rows - 1
+                            )
+                            process.stdout.write(
+                                '编码合并已完成: ' + progress.percent + '%'
+                            )
+                        })
+                        .on('error', function(err) {
+                            reject(err)
+                        })
+                        .on('end', function() {
+                            process.stdout.write('\n合并完成! (๑•̀ㅂ•́)و✧\n')
+                            resolve()
+                        })
+                })
+            } else {
+                myConsole.log('不进行转码合并\n')
+                return
+            }
+        })
+    })
+}
+/**
+ * 请求番剧或电视剧
+ *
+ * @param {*} [{
+ *     cid,
+ *     season_type = undefined,
+ *     name = 'test'
+ * }={}]
+ * @returns {Promise}
+ */
+function fetchBangumiVideos({
+    cid,
+    season_type = undefined,
+    name = 'test'
+} = {}) {
     let query = {
         query: getParams({ cid, season_type, moduleType: 'bangumi' })
     }
@@ -283,11 +381,19 @@ function fetchBangumiVideos({ cid, season_type = undefined } = {}) {
             Object.assign(hqQueryObj, bangumiBaseOptions, hqQuery)
             let hqQueryStr = url.format(hqQueryObj)
             // 第二次解析并下载
-            return fetchVideoCommon(hqQueryStr)
+            return fetchVideoCommon({
+                videourl: hqQueryStr,
+                name
+            })
         })
 }
-// 获取普通视频
-function fetchOrdinaryVideo({ cid, quality } = {}) {
+/**
+ * 获取普通视频
+ *
+ * @param {Object} [{ cid, quality, name = 'test' }={}]
+ * @returns {Promise}
+ */
+function fetchOrdinaryVideo({ cid, quality, name = 'test' } = {}) {
     let query = {
         query: getParams({ cid, quality, qn: quality })
     }
@@ -296,54 +402,71 @@ function fetchOrdinaryVideo({ cid, quality } = {}) {
     let queryStr = url.format(queryObj)
     // myConsole.log(queryStr)
     // 获取地址
-    return fetchVideoCommon(queryStr)
+    return fetchVideoCommon({
+        videourl: queryStr,
+        name
+    })
 }
-// 分析地址获取cid
+/**
+ * 分析网页获取所需参数
+ *
+ * @param {string} bilibiliurl
+ * @returns
+ */
 function analyzehtml(bilibiliurl) {
     // 番剧：https://www.bilibili.com/bangumi/play/ss23851
-    // let name = ''
+    let name = ''
     return JSDOM.fromURL(bilibiliurl, {
         runScripts: 'dangerously'
-    }).then(({ window }) => {
-        if (window && window.__INITIAL_STATE__) {
-            let cid
-            let season_type
-            let page = 0
-            let pageArr = getUrlParamArr(bilibiliurl, 'p')
-            if (pageArr && pageArr.length > 0) {
-                page = pageArr[0] - 1
-            }
-            if (window.__playinfo__ && window.__INITIAL_STATE__.videoData) {
-                cid = window.__INITIAL_STATE__.videoData.pages[page].cid
-                // name = window.__INITIAL_STATE__.videoData.title
-                let quality = window.__playinfo__.accept_quality.sort(
-                    (a, b) => b - a
-                )
-                if (quality && quality.length > 0) {
-                    quality = quality[0]
-                }
-                myConsole.log('检测到普通视频地址!\n')
-                return fetchOrdinaryVideo({ cid, quality })
-            } else if (
-                window.__INITIAL_STATE__.epInfo &&
-                window.__INITIAL_STATE__.mediaInfo
-            ) {
-                // 视频cid
-                cid = window.__INITIAL_STATE__.epInfo.cid
-                // season_type, 1 为动画, 5 为电视剧; 为5/3时, 不是番剧视频
-                season_type = window.__INITIAL_STATE__.mediaInfo.season_type
-                myConsole.log('检测到番剧或电视剧地址!\n')
-                return fetchBangumiVideos({
-                    cid,
-                    season_type
-                })
-            } else {
-                throw new Error('无法正确解析页面!!! w(ﾟДﾟ)w')
-            }
-        } else {
-            throw new Error('分析不到视频信息!!! w(ﾟДﾟ)w')
-        }
     })
+        .catch(() => {
+            myConsole.log(
+                '\n(￣ε(#￣)☆╰╮o(￣皿￣///) 解析页面时出了点岔子，正在尽力挽回...\n'
+            )
+        })
+        .then(({ window }) => {
+            if (window && window.__INITIAL_STATE__) {
+                let cid
+                let season_type
+                let page = 0
+                let pageArr = getUrlParamArr(bilibiliurl, 'p')
+                if (pageArr && pageArr.length > 0) {
+                    page = pageArr[0] - 1
+                }
+                if (window.__playinfo__ && window.__INITIAL_STATE__.videoData) {
+                    cid = window.__INITIAL_STATE__.videoData.pages[page].cid
+                    name = window.__INITIAL_STATE__.videoData.title
+                    let quality = window.__playinfo__.accept_quality.sort(
+                        (a, b) => b - a
+                    )
+                    if (quality && quality.length > 0) {
+                        quality = quality[0]
+                    }
+                    myConsole.log('╰(*°▽°*)╯ 检测到普通视频地址!\n')
+                    return fetchOrdinaryVideo({ cid, quality, name })
+                } else if (
+                    window.__INITIAL_STATE__.epInfo &&
+                    window.__INITIAL_STATE__.mediaInfo
+                ) {
+                    // 视频cid
+                    cid = window.__INITIAL_STATE__.epInfo.cid
+                    // season_type, 1 为动画, 5 为电视剧; 为5/3时, 不是番剧视频
+                    season_type = window.__INITIAL_STATE__.mediaInfo.season_type
+                    name = `${window.__INITIAL_STATE__.mediaInfo.title}第${
+                        window.__INITIAL_STATE__.epInfo.index
+                    }集${window.__INITIAL_STATE__.epInfo.index_title}`
+                    myConsole.log('╰(*°▽°*)╯ 检测到番剧或电视剧地址!\n')
+                    return fetchBangumiVideos({
+                        cid,
+                        season_type
+                    })
+                } else {
+                    throw new Error('无法正确解析页面!!! w(ﾟДﾟ)w')
+                }
+            } else {
+                throw new Error('分析不到视频信息!!! w(ﾟДﾟ)w')
+            }
+        })
 }
 // 执行
 getStdin()
